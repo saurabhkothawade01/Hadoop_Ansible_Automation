@@ -1,0 +1,61 @@
+- hosts: datanode
+  gather_facts: no
+  vars_prompt:
+          - name: data_dir
+            prompt: "Enter Directory Name of DataNode => "
+            private: no
+
+          - name: name_ip
+            prompt: "Enter NameNode/Master IP Address => "    
+            private: no
+  tasks:
+          - name: "Installing Java(JDK) Software"
+            command: rpm -ivh jdk-8u171-linux-x64.rpm
+            register: java
+            ignore_errors: yes
+       
+          - name: "Installing Hadoop Software"
+            command: rpm -ivh hadoop-1.2.1-1.x86_64.rpm --force 
+            register: hadoop
+            when: java.rc == 0
+
+          - name: "Create DataNode Directory"
+            file: 
+                path: "{{ data_dir }}" 
+                state: directory
+
+          - name: "Configured HDFS file"
+            blockinfile:
+                    path: "/etc/hadoop/hdfs-site.xml"
+                    insertafter: "<configuration>"
+                    block: 
+                        <property>
+                        <name>dfs.data.dir</name>
+                        <value>{{ data_dir }}</value>
+                        </property>  
+                     
+
+          - name: "Configured Core file"
+            blockinfile:
+                    path: "/etc/hadoop/core-site.xml"
+                    insertafter: "<configuration>"
+                    block:
+                        <property>
+                        <name>fs.default.name</name>
+                        <value>hdfs://{{ name_ip }}:9001</value>
+                        </property>
+
+          - name: Starting Hadoop DataNode service
+            shell: hadoop-daemon.sh start datanode    
+
+          - name: Checking status of DataNode Services
+            shell: "jps"
+            register: jps
+          - debug:
+              var: jps.stdout_lines
+
+          - name: Hadoop Cluster Report
+            shell: hadoop dfsadmin -report
+            register: report
+          - debug:
+               var: report
