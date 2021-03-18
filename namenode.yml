@@ -1,0 +1,59 @@
+- hosts: namenode
+  gather_facts: no
+  vars_prompt:
+          - name: name_dir
+            prompt: "Enter Directory Name of NameNode => "
+            private: no
+
+          - name: name_ip
+            prompt: "Enter NameNode/Master IP Address => "    
+            private: no
+  tasks:
+          - name: "Installing Java(JDK) Software"
+            command: rpm -ivh jdk-8u171-linux-x64.rpm
+            register: java
+            ignore_errors: yes
+       
+          - name: "Installing Hadoop Software"
+            command: rpm -ivh hadoop-1.2.1-1.x86_64.rpm --force 
+            register: hadoop
+            when: java.rc == 0
+
+          - name: "Create NameNode Directory"
+            file: 
+                path: "{{ name_dir }}" 
+                state: directory
+
+          - name: "Configured HDFS file"
+            blockinfile:
+                    path: "/etc/hadoop/hdfs-site.xml"
+                    insertafter: "<configuration>"
+                    block: 
+                        <property>
+                        <name>dfs.name.dir</name>
+                        <value>{{ name_dir }}</value>
+                        </property>  
+                     
+
+          - name: "Configured Core file"
+            blockinfile:
+                    path: "/etc/hadoop/core-site.xml"
+                    insertafter: "<configuration>"
+                    block:
+                        <property>
+                        <name>fs.default.name</name>
+                        <value>hdfs://{{ name_ip }}:9001</value>
+                        </property>
+           
+          
+          - name: Formatting Name Node Directory
+            shell: "echo Y | hadoop namenode -format"  
+
+          - name: Starting Hadoop NameNode service
+            shell: hadoop-daemon.sh start namenode    
+
+          - name: Checking status of NameNode Services
+            shell: "jps"
+            register: jps
+          - debug:
+                  var: jps.stdout_lines  
